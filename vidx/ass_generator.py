@@ -230,6 +230,9 @@ class ASSGenerator:
                 transparency=v_tr,
             )
             v_border_style = 3  # 3 = opaque box around text
+            # ASS format uses OutlineColour for the box when BorderStyle=3
+            v_outline_col = v_bg_col
+            v_bg_col = "&H00000000"
         else:
             v_bg_col = "&H00000000"
             v_border_style = 1  # 1 = outline + shadow
@@ -260,6 +263,9 @@ class ASSGenerator:
                 transparency=h_tr,
             )
             h_border_style = 3
+            # ASS format uses OutlineColour for the box when BorderStyle=3
+            h_outline_col = h_bg_col
+            h_bg_col = "&H00000000"
         else:
             h_bg_col = "&H00000000"
             h_border_style = 1
