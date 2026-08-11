@@ -525,7 +525,7 @@ class BatchRunner:
                     str(bg_path),
                 ]
                 res = subprocess.run(
-                    probe_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                    probe_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8"
                 )
                 if res.returncode != 0 or not res.stdout.strip():
                     continue
@@ -660,6 +660,7 @@ class BatchRunner:
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             text=True,
+                            encoding="utf-8",
                         )
                         if dur_res.returncode == 0 and dur_res.stdout.strip():
                             bg_dur = float(dur_res.stdout.strip())
@@ -705,7 +706,7 @@ class BatchRunner:
                 ff_cmd.extend(["-r", str(fps), "-an", str(cached_path)])
 
                 proc = subprocess.run(
-                    ff_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                    ff_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8"
                 )
                 if (
                     proc.returncode == 0

@@ -100,6 +100,7 @@ class FFmpegBuilder:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                encoding="utf-8",
             )
             if res.returncode == 0 and res.stdout.strip():
                 return float(res.stdout.strip())
@@ -385,6 +386,7 @@ class FFmpegBuilder:
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
+                    encoding="utf-8",
                     check=True,
                 )
                 return True, res.stderr or "Success"
@@ -416,6 +418,7 @@ class FFmpegBuilder:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding="utf-8",
                 bufsize=1,
                 universal_newlines=True,
             )

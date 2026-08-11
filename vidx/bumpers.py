@@ -59,6 +59,7 @@ def get_media_duration(file_path: str) -> float:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            encoding="utf-8",
             check=True,
         )
         val = res.stdout.strip()
