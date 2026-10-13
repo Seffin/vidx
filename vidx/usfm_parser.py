@@ -62,6 +62,17 @@ class USFMParser:
 
     def _clean_text(self, text):
         """Remove USFM markers and notes from text"""
+        if not text:
+            return ""
+
+        # ── ASS override-tag preservation ──────────────────────────────────
+        # Some verse/heading texts arrive with inline ASS override tags such
+        # as {\an5\fad(500,500)}.  The marker-stripping regexes below would
+        # mangle these brace-delimited sequences, so we temporarily replace
+        # them with NUL placeholders and restore them after cleanup.
+        ass_tags = re.findall(r"\{.*?\}", text)
+        text = re.sub(r"\{.*?\}", "\x00", text)
+
         # Remove footnotes \f, \fe, \ef, \fqa (everything between including nested markers and prefix symbols)
         text = re.sub(
             r"\\(?:f|fe|ef|fqa)\b.*?\\(?:f|fe|ef|fqa)\*", "", text, flags=re.DOTALL
@@ -92,6 +103,11 @@ class USFMParser:
         text = re.sub(r"\s*\*\s*", " ", text)  # Remove standalone *
         text = re.sub(r"\s+", " ", text)  # Normalize whitespace
         text = text.strip()
+
+        # ── Restore ASS override tags ──────────────────────────────────────
+        # Put back each preserved ASS tag in order, replacing NUL placeholders.
+        for tag in ass_tags:
+            text = text.replace("\x00", tag, 1)
 
         return text
 

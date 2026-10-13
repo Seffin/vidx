@@ -174,6 +174,16 @@ class FFmpegBuilder:
 
         sub_path_clean = self._clean_filter_path(subtitle_file)
 
+        # Resolve the user-local fonts directory so ffmpeg's libass renderer
+        # can find non-system fonts (e.g. Malayalam typefaces installed per-user).
+        # Falls back to the hardcoded DELL profile path when LOCALAPPDATA is unset.
+        import os
+        fonts_dir = str(Path(os.environ.get("LOCALAPPDATA", "C:/Users/DELL/AppData/Local")) / "Microsoft" / "Windows" / "Fonts")
+        fonts_dir_clean = self._clean_filter_path(fonts_dir)
+        # Build the ASS filter with an explicit fontsdir so subtitles render
+        # with the correct font even if it's not in the system-wide font store.
+        ass_filter = f"ass='{sub_path_clean}':fontsdir='{fonts_dir_clean}'"
+
         title_image = video_cfg.get("title_image") or self.config.get(
             "bumpers", {}
         ).get("title_image")
@@ -285,7 +295,7 @@ class FFmpegBuilder:
                 curr_v = "[v_wm]"
                 next_idx += 1
 
-            fc_parts.append(f"{curr_v}ass='{sub_path_clean}'[v]")
+            fc_parts.append(f"{curr_v}{ass_filter}[v]")
             if af_list:
                 fc_parts.append(f"[1:a]{','.join(af_list)}[a]")
                 cmd.extend(
@@ -310,7 +320,7 @@ class FFmpegBuilder:
                     ]
                 )
         else:
-            vf_chain = f"{scale_filter},ass='{sub_path_clean}'"
+            vf_chain = f"{scale_filter},{ass_filter}"
             cmd.extend(["-vf", vf_chain])
             if af_list:
                 cmd.extend(["-af", ",".join(af_list)])

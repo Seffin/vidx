@@ -499,7 +499,59 @@ class ASSGenerator:
         return "\n".join(lines)
 
 
+
+def _embed_font_if_needed(ass_content, font_name):
+    """Embed a font file directly into the ASS subtitle content as a [Fonts] section.
+
+    When the verse style references a known Malayalam font (Noto Sans Malayalam,
+    Noto Serif Malayalam, or Meera Inimai), this function reads the corresponding
+    TTF file from the local Windows user-font directory and encodes it using the
+    ASS/SSA UUEncoding scheme (splitting every 3 bytes into 4 printable chars,
+    each offset by +33). The encoded data is appended as a [Fonts] block so that
+    media players and renderers that support embedded fonts can display the
+    correct glyphs without requiring the font to be installed system-wide.
+
+    Args:
+        ass_content (str): The full text of the generated ASS subtitle file.
+        font_name   (str): The font family name used in the verse style
+                           (matched against the known font map).
+
+    Returns:
+        str: The (possibly augmented) ASS content with an embedded [Fonts]
+             section, or the original content unchanged if no matching font
+             was found.
+    """
+    import os
+    font_paths = {
+        'Noto Sans Malayalam': r'C:\Users\DELL\AppData\Local\Microsoft\Windows\Fonts\NotoSansMalayalam.ttf',
+        'Noto Serif Malayalam': r'C:\Users\DELL\AppData\Local\Microsoft\Windows\Fonts\NotoSerifMalayalam.ttf',
+        'Meera Inimai': r'C:\Users\DELL\AppData\Local\Microsoft\Windows\Fonts\MeeraInimai-Regular.ttf'
+    }
+    for key, path in font_paths.items():
+        if key in font_name and os.path.exists(path):
+            if '[Fonts]' not in ass_content:
+                ass_content += '\n[Fonts]\n'
+                ass_content += f'fontname: {os.path.basename(path)}\n'
+                # Read the raw TTF binary and UUEncode it for ASS embedding
+                with open(path, 'rb') as f:
+                    data = f.read()
+                res = []
+                for i in range(0, len(data), 3):
+                    chunk = data[i:i+3]
+                    chunk = chunk + b'\0' * (3 - len(chunk))  # pad to 3 bytes
+                    val = (chunk[0] << 16) | (chunk[1] << 8) | chunk[2]
+                    res.append(chr((val >> 18) + 33))
+                    res.append(chr(((val >> 12) & 0x3F) + 33))
+                    res.append(chr(((val >> 6) & 0x3F) + 33))
+                    res.append(chr((val & 0x3F) + 33))
+                s = ''.join(res)
+                # Wrap encoded data at 80 chars per line (ASS convention)
+                encoded = '\n'.join(s[i:i+80] for i in range(0, len(s), 80))
+                ass_content += encoded + '\n\n'
+    return ass_content
+
 def convert_to_ass(
+
     usfm_file,
     timing_file,
     output_file=None,
@@ -588,6 +640,12 @@ def convert_to_ass(
     )
     ass_content = generator.generate()
 
+
+    # Embed the referenced font (if available locally) into the ASS file so
+    # playback works on machines that don't have the font installed.
+    ass_content = _embed_font_if_needed(ass_content, generator.verse_style.get('font', ''))
+
     output_file.parent.mkdir(parents=True, exist_ok=True)
+
     output_file.write_text(ass_content, encoding="utf-8")
     return True
