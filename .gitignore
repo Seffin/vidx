@@ -74,3 +74,6 @@ src/snd/45ACTsnd.SFM
 site/
 .gstack/
 work/
+
+# Local, unpublished working files
+.local/

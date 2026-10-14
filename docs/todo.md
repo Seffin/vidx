@@ -31,6 +31,8 @@
 
 ## 🎬 Multimedia Production Enhancements
 
+- [ ] Burn subtitles into an existing video — [#20](https://github.com/beniza/vidx/issues/20) *(needs-design)*
+
 - [x] **Title Cards & Video Thumbnail Support**
   - [x] Enable users to specify a still title image (`video.title_card: "assets/title.jpg"`, `video.title_duration: 4.0`) that displays at the beginning of the video before scripture dialogue starts.
   - [x] Ensure title cards are rendered at the exact target resolution (`1920x1080`, `1080x1920`, or `1080x1080`) so they can serve dual purpose as YouTube, Facebook, and Instagram video thumbnails.
@@ -46,7 +48,7 @@
   - [x] **One-Touch Upload (`--publish`):** Enable single-command or GUI button publishing that automatically uploads rendered `.mp4` video files to the designated channel immediately after generation.
   - [x] **Automated Metadata & Thumbnails:** Automatically set video Title to scripture book and chapter, populate the video Description with verse ranges and translation copyright, attach tags (`#AudioBible`, `#Scripture`), and upload the generated `title_card.jpg` as the official video thumbnail!
   - [x] **Playlist Organization:** Automatically organize uploaded chapter videos into book-level playlists (e.g., *"Gospel of Mark — Malayalam Translation"*).
-  - [ ] YouTube Chapters from Section Headings — [#9](https://github.com/beniza/vidx/issues/9)
+  - [x] YouTube Chapters from Section Headings — [#9](https://github.com/beniza/vidx/issues/9)
   - [ ] Verse Timing in Description — [#10](https://github.com/beniza/vidx/issues/10)
   - [ ] Vimeo support — [#15](https://github.com/beniza/vidx/issues/15) *(needs-design)*
 
