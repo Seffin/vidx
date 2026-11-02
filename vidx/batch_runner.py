@@ -439,12 +439,14 @@ class BatchRunner:
         job.render_time = time.time() - start_t
 
         if render_success:
-            # ── Video bumper concat (intro_video / outro_video) ──────────────────
+            # ── Video bumper concat (intro_video + main + outro_video + end_screen_video) ──
             intro_video = bumpers_cfg.get("intro_video")
-            outro_video = bumpers_cfg.get("outro_video")
+            outro_video = bumpers_cfg.get("outro_video") or bumpers_cfg.get("end_video") or bumpers_cfg.get("outro_videos")
+            end_screen_video = bumpers_cfg.get("end_screen_video") or bumpers_cfg.get("endscreen_video")
             if (
                 (intro_video and Path(intro_video).exists())
-                or (outro_video and Path(outro_video).exists())
+                or outro_video
+                or (end_screen_video and Path(end_screen_video).exists())
             ):
                 from .bumpers import concat_video_bumpers
                 video_cfg = self.config.raw_config.get("video", {})
@@ -460,6 +462,7 @@ class BatchRunner:
                     output_video=str(bumped_path),
                     intro_video=intro_video,
                     outro_video=outro_video,
+                    end_screen_video=end_screen_video,
                     target_resolution=resolution,
                     fps=fps,
                     video_codec=job.codec_used if hasattr(job, "codec_used") and job.codec_used else "libx264",
