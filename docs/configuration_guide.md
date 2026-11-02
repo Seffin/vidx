@@ -108,25 +108,38 @@ The `audio` block specifies encoding parameters as well as introductory/concludi
 
 ---
 
-## 🔔 4b. The `bumpers` Block (Intro & Outro Audio)
+## 🔔 4b. The `bumpers` Block (Intro & Outro Video / Audio)
 
-Intro and outro audio are configured in their **own top-level block**, not under `audio`.
+Intro and outro media (video clips or audio jingles) are configured in their **own top-level block**, not under `audio`.
 Getting this wrong is silent: a misplaced key is simply ignored and no bumper is added.
 
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `intro_audio` | String | *(unset)* | Audio played **before** the narration. VIDX measures its real duration and shifts every subtitle timestamp forward to match, so sync stays frame-accurate. |
+| `intro_video` | String | *(unset)* | Pre-recorded video clip (.mp4) prepended **before** the scripture video. VIDX measures its real duration, automatically shifts every subtitle and YouTube chapter timestamp forward to match, and seamlessly concatenates the clips via FFmpeg. |
+| `outro_video` | String | *(unset)* | Pre-recorded video clip (.mp4) appended **after** the scripture video concludes. |
+| `intro_audio` | String | *(unset)* | Audio jingle played **before** the narration (over the looping background video). VIDX measures its real duration and shifts every subtitle timestamp forward to match, so sync stays frame-accurate. |
 | `outro_audio` | String | *(unset)* | Audio played **after** the narration concludes. |
 | `title_image` | String | *(unset)* | Fallback location for `video.title_image`. |
 | `title_duration` | Float | `3.0` | Fallback location for `video.title_duration`. |
 | `outro_image` | String | *(unset)* | Fallback location for `video.outro_image`. |
 | `outro_start` | Float | `0.0` | Fallback location for `video.outro_start`. |
 
+### Video Bumpers Example
 ```yaml
 bumpers:
-  intro_audio: "assets/intro.mp3"   # subtitles shift automatically by its duration
+  intro_video: "assets/intro.mp4"   # prepended before scripture; subtitle & YouTube markers shift automatically
+  outro_video: "assets/outro.mp4"   # appended after scripture finishes
+```
+
+### Audio Bumpers Example
+```yaml
+bumpers:
+  intro_audio: "assets/intro.mp3"   # audio jingle over background; subtitles shift automatically
   outro_audio: "assets/outro.mp3"
 ```
+
+> [!NOTE]
+> When using `intro_video` or `outro_video`, VIDX normalises all clips to match the project's target resolution, framerate, and codecs before concatenating them with FFmpeg's concat demuxer. Both video and audio bumpers automatically calculate the intro offset so subtitles and chapter timestamps remain 100% accurate!
 
 > [!NOTE]
 > Background music is **not** a bumper — it lives at `audio.background_music`. The

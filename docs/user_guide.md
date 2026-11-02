@@ -182,12 +182,23 @@ video:
   title_duration: 4.0            # Duration in seconds
 ```
 
-### 3. Audio Bumpers & Looped Background Music (BGM)
-Give your videos a broadcast-ready feel by adding introductory/concluding audio clips and seamless background instrumental music:
+### 3. Video & Audio Bumpers and Looped Background Music (BGM)
+Give your videos a broadcast-ready feel by adding introductory/concluding video clips or audio jingles, plus seamless background instrumental music:
+
+**Pre-recorded Video Bumpers (Intro & Outro):**
 ```yaml
+bumpers:
+  intro_video: "assets/intro.mp4"       # Prepended before scripture video (subtitles shift automatically!)
+  outro_video: "assets/outro.mp4"       # Appended after scripture finishes
+```
+
+**Audio Jingles & Background Music:**
+```yaml
+bumpers:
+  intro_audio: "assets/intro.mp3"       # Plays before narration (subtitles shift automatically)
+  outro_audio: "assets/outro.mp3"       # Plays after narration concludes
+
 audio:
-  intro_clip: "assets/intro.mp3"       # Plays before scripture starts (subtitles shift automatically!)
-  outro_clip: "assets/outro.mp3"       # Plays after scripture concludes
   background_music: "assets/bgm.mp3"   # Automatically looped to match reading duration
   background_music_volume: 0.15        # Blended cleanly without reducing narrator voice volume
 ```

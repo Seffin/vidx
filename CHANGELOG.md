@@ -5,9 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.7] - 2026-11-02
 
 ### Added
+- **Pre-recorded Video Bumpers (`intro_video` and `outro_video`):** Added native support for prepending an intro video clip and appending an outro (outdraw) video clip around rendered scripture videos in the `bumpers:` configuration block.
+  - Automatically measures the intro video duration and shifts subtitle timestamps (`.ass`, `.srt`) and YouTube chapter timestamps so scripture sync remains 100% frame-accurate.
+  - Automatically re-encodes and normalises intro/outro/scripture clips to target project resolution, framerate, and audio/video codecs before seamless concatenation via FFmpeg's concat demuxer.
+  - Audio-only bumpers (`intro_audio` / `outro_audio`) continue to work seamlessly for audio jingles overlaid on looping background video.
 - **YouTube Chapters from Section Headings (`{chapters}`)** — issue #9. Put `{chapters}` in `description_template` and VIDX emits a timestamped chapter list built from the `\s` headings and their existing timings, i.e. the same headings the viewer sees on screen. No new config key: the placeholder's presence is the switch, so projects that don't use it pay nothing and behave exactly as before. It reaches both the API upload and the copy-paste `metadata.txt` because both take the resolved description verbatim.
   - YouTube shows **no** chapters at all unless the list starts at `0:00`, has ≥3 markers, and every chapter runs ≥10s. All three are enforced: the first heading collapses to `0:00` when it starts within 10s, otherwise a synthetic marker labelled `<book> <ch>:1` is inserted (the Mark 9 case, where verse 1 precedes the first heading); markers closer than 10s are dropped; and if fewer than 3 survive the block is left empty with a warning naming the timing file, since a two-heading chapter is ordinary translation data rather than a misconfiguration.
   - Labels carry the verse range, e.g. `0:00 <heading> (1:1-8)`. The range uses numeric endpoints rather than joined segment ids, because a merged verse id is itself `3-4` and joining would read `3-4-5` for a section spanning 3-4 through 5.

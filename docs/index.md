@@ -42,7 +42,7 @@
 | **Smart Backgrounds** | Automatically loop short background video clips or animate static images to match audio duration. |
 | **Configurable Transparency**| Fine-tune semi-transparent background readability boxes behind subtitles using explicit opacity decimals (`0.0`-`1.0`) or transparency percentages (`0`-`100`). |
 | **Title Cards & Thumbnails** | Display a still title image before scripture reading starts; doubles as an instant YouTube/social media video thumbnail. |
-| **Broadcast Bumpers & BGM** | Concatenate intro/outro audio jingles (with automatic subtitle timestamp shifting!) and seamlessly blend looped instrumental background music (`amix`). |
+| **Broadcast Bumpers & BGM** | Concatenate intro/outro video clips or audio jingles (with automatic subtitle timestamp shifting!) and seamlessly blend looped instrumental background music (`amix`). |
 | **Hardware GPU Acceleration** | Autodetect NVIDIA NVENC (`h264_nvenc`) and Intel QSV (`h264_qsv`) for 3x–10x faster encoding speeds, featuring live terminal GPU monitoring! |
 | **Auto 1080p Preprocessing & Caching** | Automatically downscales 4K media down to 1080p and bakes seamless loop crossfades (`xfade`) before batch rendering, eliminating CPU decoding bottlenecks! |
 | **Branding Overlays & Fades** | Add station corner watermarks/logos with alpha transparency (`video.watermark`) and smooth audio transitions at chapter boundaries (`audio.fade_in_sec` / `fade_out_sec`). |
