@@ -335,8 +335,9 @@ def concat_video_bumpers(
     concat_list = tmp_dir / "concat_list.txt"
     with open(concat_list, "w", encoding="utf-8") as cf:
         for cp in clip_paths:
-            # FFmpeg concat list uses forward slashes; escape single quotes
-            safe = cp.replace("'", "'\''")
+            # FFmpeg concat list requires absolute paths with forward slashes
+            abs_posix = Path(cp).resolve().as_posix()
+            safe = abs_posix.replace("'", "'\''")
             cf.write(f"file '{safe}'\n")
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
