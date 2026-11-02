@@ -439,6 +439,47 @@ class BatchRunner:
         job.render_time = time.time() - start_t
 
         if render_success:
+            # ── Video bumper concat (intro_video / outro_video) ──────────────────
+            intro_video = bumpers_cfg.get("intro_video")
+            outro_video = bumpers_cfg.get("outro_video")
+            if (
+                (intro_video and Path(intro_video).exists())
+                or (outro_video and Path(outro_video).exists())
+            ):
+                from .bumpers import concat_video_bumpers
+                video_cfg = self.config.raw_config.get("video", {})
+                resolution = video_cfg.get("resolution", "1920x1080")
+                fps = int(video_cfg.get("fps", 24))
+                crf = int(video_cfg.get("crf", 23))
+                preset = video_cfg.get("preset", "fast")
+                bumped_path = out_path.with_name(
+                    out_path.stem + "_final" + out_path.suffix
+                )
+                vbump_ok, vbump_intro_dur = concat_video_bumpers(
+                    main_video=str(out_path),
+                    output_video=str(bumped_path),
+                    intro_video=intro_video,
+                    outro_video=outro_video,
+                    target_resolution=resolution,
+                    fps=fps,
+                    video_codec=job.codec_used if hasattr(job, "codec_used") and job.codec_used else "libx264",
+                    crf=crf,
+                    preset=preset,
+                )
+                if vbump_ok and bumped_path.exists():
+                    # Replace the intermediate file with the final bumpered version
+                    try:
+                        out_path.unlink()
+                    except Exception:
+                        pass
+                    bumped_path.rename(out_path)
+                    if "bumpers" not in self.config.raw_config:
+                        self.config.raw_config["bumpers"] = {}
+                    self.config.raw_config["bumpers"]["_calc_intro_duration"] = vbump_intro_dur
+                    print(f"[*] Video bumper applied — final: {out_path.name}")
+                else:
+                    print("[!] Video bumper concat failed — keeping scripture video without bumpers.")
+            # ─────────────────────────────────────────────────────────────────────
             job.status = "SUCCESS"
             if not job.keep_ass:
                 try:

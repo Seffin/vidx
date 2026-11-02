@@ -1,5 +1,6 @@
 import shutil
 import subprocess
+import tempfile
 import wave
 from pathlib import Path
 from typing import Optional, Tuple
@@ -15,6 +16,8 @@ except ImportError:
 class BumperConfig:
     intro_audio: Optional[str] = None
     outro_audio: Optional[str] = None
+    intro_video: Optional[str] = None
+    outro_video: Optional[str] = None
     title_image: Optional[str] = None
     outro_image: Optional[str] = None
     title_duration: Optional[float] = None
@@ -34,9 +37,13 @@ def intro_offset_seconds(config) -> float:
         return 0.0
     bumpers_cfg = config.get("bumpers", {}) or {}
     video_cfg = config.get("video", {}) or {}
-    # written by the render path once the real intro audio has been built
+    # written by the render path once the real intro video/audio has been built
     if "_calc_intro_duration" in bumpers_cfg:
         return float(bumpers_cfg["_calc_intro_duration"])
+    # Video intro takes priority over audio intro for offset calculation
+    intro_vid = bumpers_cfg.get("intro_video")
+    if intro_vid and Path(intro_vid).exists():
+        return get_media_duration(intro_vid)
     intro = bumpers_cfg.get("intro_audio")
     if intro and Path(intro).exists():
         return get_media_duration(intro)
@@ -213,3 +220,150 @@ def prepare_bumper_audio(
             return False, intro_dur, 0.0
     except Exception:
         return False, intro_dur, 0.0
+
+def concat_video_bumpers(
+    main_video: str,
+    output_video: str,
+    intro_video: Optional[str] = None,
+    outro_video: Optional[str] = None,
+    target_resolution: str = "1920x1080",
+    fps: int = 24,
+    video_codec: str = "libx264",
+    audio_codec: str = "aac",
+    crf: int = 23,
+    preset: str = "fast",
+) -> Tuple[bool, float]:
+    """
+    Concatenate intro_video + main_video + outro_video into output_video using FFmpeg.
+
+    All clips are re-encoded to a common resolution/fps/codec so the concat filter
+    works reliably even when the intro/outro resolution differs from the scripture video.
+
+    Returns: (success: bool, intro_duration_sec: float)
+    """
+    main_path = Path(main_video)
+    out_path = Path(output_video)
+
+    if not main_path.exists():
+        print(f"[!] Video bumper concat: main video not found: {main_path}")
+        return False, 0.0
+
+    intro_path = Path(intro_video) if intro_video else None
+    outro_path = Path(outro_video) if outro_video else None
+
+    has_intro = intro_path is not None and intro_path.exists()
+    has_outro = outro_path is not None and outro_path.exists()
+
+    if not has_intro and not has_outro:
+        # Nothing to do — copy in place if paths differ
+        if str(main_path.resolve()) != str(out_path.resolve()):
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(str(main_path), str(out_path))
+        return True, 0.0
+
+    intro_dur = get_media_duration(str(intro_path)) if has_intro else 0.0
+    intro_label = f"YES ({round(intro_dur, 1)}s)" if has_intro else "NO"
+    outro_label = "YES" if has_outro else "NO"
+    print(f"[*] Video bumper: intro={intro_label}, outro={outro_label}")
+
+    # Parse target resolution
+    try:
+        tw, th = map(int, target_resolution.split("x"))
+    except Exception:
+        tw, th = 1920, 1080
+
+    scale_filter = (
+        f"scale={tw}:{th}:force_original_aspect_ratio=decrease,"
+        f"pad={tw}:{th}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={fps}"
+    )
+
+    # Use a temporary directory for intermediate normalised clips
+    tmp_dir = out_path.parent / ".bumper_tmp"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+
+    def normalize_clip(src: Path, dst: Path) -> bool:
+        """Re-encode a clip to common resolution/fps/codec so FFmpeg concat works."""
+        norm_cmd = [
+            "ffmpeg", "-y", "-i", str(src),
+            "-vf", scale_filter,
+            "-c:v", video_codec,
+            "-preset", preset,
+            "-crf", str(crf),
+            "-c:a", audio_codec,
+            "-ar", "48000",
+            "-ac", "2",
+            str(dst),
+        ]
+        res = subprocess.run(norm_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if res.returncode != 0:
+            print(f"[!] Bumper normalisation failed for {src.name}:")
+            print(res.stderr.decode("utf-8", errors="replace")[-800:])
+        return res.returncode == 0 and dst.exists()
+
+    # Build list of clips to concatenate
+    clip_paths = []
+
+    if has_intro:
+        norm_intro = tmp_dir / ("intro_norm" + intro_path.suffix)
+        if normalize_clip(intro_path, norm_intro):
+            clip_paths.append(str(norm_intro))
+        else:
+            print("[!] Skipping intro video — normalisation failed.")
+
+    # Main scripture video — normalise so codec/resolution matches bumpers
+    norm_main = tmp_dir / ("main_norm" + main_path.suffix)
+    if normalize_clip(main_path, norm_main):
+        clip_paths.append(str(norm_main))
+    else:
+        print("[!] Main video normalisation failed — using original.")
+        clip_paths.append(str(main_path))
+
+    if has_outro:
+        norm_outro = tmp_dir / ("outro_norm" + outro_path.suffix)
+        if normalize_clip(outro_path, norm_outro):
+            clip_paths.append(str(norm_outro))
+        else:
+            print("[!] Skipping outro video — normalisation failed.")
+
+    if len(clip_paths) == 1 and clip_paths[0] == str(main_path):
+        # Nothing useful was added — just copy
+        if str(main_path.resolve()) != str(out_path.resolve()):
+            shutil.copyfile(str(main_path), str(out_path))
+        return True, intro_dur
+
+    # Write FFmpeg concat list file
+    concat_list = tmp_dir / "concat_list.txt"
+    with open(concat_list, "w", encoding="utf-8") as cf:
+        for cp in clip_paths:
+            # FFmpeg concat list uses forward slashes; escape single quotes
+            safe = cp.replace("'", "'\''")
+            cf.write(f"file '{safe}'\n")
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    concat_cmd = [
+        "ffmpeg", "-y",
+        "-f", "concat",
+        "-safe", "0",
+        "-i", str(concat_list),
+        "-c", "copy",
+        str(out_path),
+    ]
+    print(f"[*] Concatenating {len(clip_paths)} clips into: {out_path.name}")
+    res = subprocess.run(concat_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    ok = res.returncode == 0 and out_path.exists() and out_path.stat().st_size > 0
+    if not ok:
+        print("[!] Video concat failed:")
+        print(res.stderr.decode("utf-8", errors="replace")[-800:])
+
+    # Cleanup temp normalised clips (keep concat_list for debugging)
+    try:
+        for p in tmp_dir.iterdir():
+            if p.name != "concat_list.txt":
+                try:
+                    p.unlink()
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    return ok, intro_dur
