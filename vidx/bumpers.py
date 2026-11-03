@@ -18,6 +18,8 @@ class BumperConfig:
     outro_audio: Optional[str] = None
     intro_video: Optional[str] = None
     outro_video: Optional[str] = None
+    end_screen_video: Optional[str] = None
+    end_screen_duration: Optional[float] = None
     title_image: Optional[str] = None
     outro_image: Optional[str] = None
     title_duration: Optional[float] = None
@@ -37,7 +39,7 @@ def intro_offset_seconds(config) -> float:
         return 0.0
     bumpers_cfg = config.get("bumpers", {}) or {}
     video_cfg = config.get("video", {}) or {}
-    # written by the render path once the real intro video/audio has been built
+    # Intro and outro offsets for bumpers
     if "_calc_intro_duration" in bumpers_cfg:
         return float(bumpers_cfg["_calc_intro_duration"])
     # Video intro takes priority over audio intro for offset calculation
@@ -50,6 +52,47 @@ def intro_offset_seconds(config) -> float:
     if video_cfg.get("title_image") or bumpers_cfg.get("title_image"):
         return float(
             video_cfg.get("title_duration") or bumpers_cfg.get("title_duration") or 3.0
+        )
+    return 0.0
+
+
+def outro_duration_seconds(config) -> float:
+    """Seconds of outro/end-screen appended after narration ends.
+
+    Used by chapter marker generator so conclusion markers can be validated
+    against YouTube's 10-second minimum duration rule.
+    """
+    if not config:
+        return 0.0
+    bumpers_cfg = config.get("bumpers", {}) or {}
+    total = 0.0
+    ov = bumpers_cfg.get("outro_video")
+    if ov:
+        if isinstance(ov, (list, tuple)):
+            for p in ov:
+                if Path(p).exists():
+                    total += get_media_duration(str(p))
+        elif Path(ov).exists():
+            total += get_media_duration(str(ov))
+    es = bumpers_cfg.get("end_screen_video") or bumpers_cfg.get("endscreen_video")
+    es_dur = bumpers_cfg.get("end_screen_duration") or bumpers_cfg.get("endscreen_duration")
+    if es and Path(es).exists():
+        p_es = Path(es)
+        ov_list = [Path(x) for x in ov] if isinstance(ov, (list, tuple)) else ([Path(ov)] if ov else [])
+        if p_es not in ov_list:
+            if es_dur:
+                total += float(es_dur)
+            else:
+                total += get_media_duration(str(es))
+    if total > 0.0:
+        return total
+    oa = bumpers_cfg.get("outro_audio")
+    if oa and Path(oa).exists():
+        return get_media_duration(str(oa))
+    video_cfg = config.get("video", {}) or {}
+    if video_cfg.get("outro_image") or bumpers_cfg.get("outro_image"):
+        return float(
+            video_cfg.get("outro_duration") or bumpers_cfg.get("outro_duration") or 3.0
         )
     return 0.0
 
@@ -233,6 +276,8 @@ def concat_video_bumpers(
     audio_codec: str = "aac",
     crf: int = 23,
     preset: str = "fast",
+    end_screen_duration: Optional[float] = None,
+    outro_duration: Optional[float] = None,
 ) -> Tuple[bool, float]:
     """
     Concatenate intro_video + main_video + outro_videos into output_video using FFmpeg.
@@ -279,7 +324,14 @@ def concat_video_bumpers(
 
     intro_dur = get_media_duration(str(intro_path)) if has_intro else 0.0
     intro_label = f"YES ({round(intro_dur, 1)}s)" if has_intro else "NO"
-    outro_labels = ", ".join(f"{p.name} ({round(get_media_duration(str(p)), 1)}s)" for p in outro_paths) if outro_paths else "NO"
+    def _get_outro_len(p: Path) -> float:
+        if end_screen_video and p == Path(end_screen_video) and end_screen_duration:
+            return float(end_screen_duration)
+        if outro_duration and outro_video and p == Path(outro_video):
+            return float(outro_duration)
+        return get_media_duration(str(p))
+
+    outro_labels = ", ".join(f"{p.name} ({round(_get_outro_len(p), 1)}s)" for p in outro_paths) if outro_paths else "NO"
     print(f"[*] Video bumper: intro={intro_label}, outros=[{outro_labels}]")
 
     # Parse target resolution
@@ -307,13 +359,16 @@ def concat_video_bumpers(
         except Exception:
             return False
 
-    def normalize_clip(src: Path, dst: Path) -> bool:
+    def normalize_clip(src: Path, dst: Path, duration: Optional[float] = None) -> bool:
         """Re-encode a clip to common resolution/fps/codec so FFmpeg concat works.
         Adds silent audio if source file has no audio stream."""
         has_a = has_audio_stream(src)
+        dur_args = ["-t", str(duration)] if duration else []
         if has_a:
             norm_cmd = [
-                "ffmpeg", "-y", "-i", str(src),
+                "ffmpeg", "-y",
+                *dur_args,
+                "-i", str(src),
                 "-vf", scale_filter,
                 "-c:v", video_codec,
                 "-preset", preset,
@@ -321,12 +376,14 @@ def concat_video_bumpers(
                 "-c:a", audio_codec,
                 "-ar", "48000",
                 "-ac", "2",
+                *dur_args,
                 str(dst),
             ]
         else:
             # Source is silent/video-only: synthesize silent stereo audio matching video duration
             norm_cmd = [
                 "ffmpeg", "-y",
+                *dur_args,
                 "-i", str(src),
                 "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
                 "-vf", scale_filter,
@@ -335,6 +392,7 @@ def concat_video_bumpers(
                 "-crf", str(crf),
                 "-c:a", audio_codec,
                 "-shortest",
+                *dur_args,
                 str(dst),
             ]
         res = subprocess.run(norm_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -364,7 +422,12 @@ def concat_video_bumpers(
     # 3. Outros (e.g. End.mp4 + end screen.mp4)
     for idx, op in enumerate(outro_paths):
         norm_outro = tmp_dir / f"outro_{idx}_norm{op.suffix}"
-        if normalize_clip(op, norm_outro):
+        dur = None
+        if end_screen_video and op == Path(end_screen_video) and end_screen_duration:
+            dur = float(end_screen_duration)
+        elif outro_duration and outro_video and op == Path(outro_video):
+            dur = float(outro_duration)
+        if normalize_clip(op, norm_outro, duration=dur):
             clip_paths.append(str(norm_outro))
         else:
             print(f"[!] Skipping outro video {op.name} — normalisation failed.")

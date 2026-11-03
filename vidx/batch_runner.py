@@ -443,6 +443,8 @@ class BatchRunner:
             intro_video = bumpers_cfg.get("intro_video")
             outro_video = bumpers_cfg.get("outro_video") or bumpers_cfg.get("end_video") or bumpers_cfg.get("outro_videos")
             end_screen_video = bumpers_cfg.get("end_screen_video") or bumpers_cfg.get("endscreen_video")
+            end_screen_duration = bumpers_cfg.get("end_screen_duration") or bumpers_cfg.get("endscreen_duration")
+            outro_duration = bumpers_cfg.get("outro_duration")
             if (
                 (intro_video and Path(intro_video).exists())
                 or outro_video
@@ -463,6 +465,8 @@ class BatchRunner:
                     intro_video=intro_video,
                     outro_video=outro_video,
                     end_screen_video=end_screen_video,
+                    end_screen_duration=float(end_screen_duration) if end_screen_duration else None,
+                    outro_duration=float(outro_duration) if outro_duration else None,
                     target_resolution=resolution,
                     fps=fps,
                     video_codec=job.codec_used if hasattr(job, "codec_used") and job.codec_used else "libx264",
@@ -1047,7 +1051,7 @@ class BatchRunner:
         # Same intro offset the subtitles were shifted by. Safe to read here:
         # _generate_publishing_manifests runs on the main thread after every
         # render future has joined, so _calc_intro_duration is already written.
-        from .bumpers import intro_offset_seconds
+        from .bumpers import intro_offset_seconds, outro_duration_seconds
 
         offset = intro_offset_seconds(self.config.raw_config)
 
@@ -1088,12 +1092,30 @@ class BatchRunner:
             chapters = ""
             if "{chapters}" in desc_tmpl and job.usfm_file and job.timing_file:
                 try:
+                    intro_lbl_tmpl = pub_cfg.get("intro_label")
+                    intro_label = (
+                        resolve_metadata_template(intro_lbl_tmpl, **common)
+                        if intro_lbl_tmpl
+                        else f"{h_name or book} {ch}"
+                    )
+                    outro_lbl_tmpl = pub_cfg.get("conclusion_label") or pub_cfg.get(
+                        "outro_label"
+                    )
+                    outro_label = (
+                        resolve_metadata_template(outro_lbl_tmpl, **common)
+                        if outro_lbl_tmpl
+                        else f"{h_name or book} {ch} Conclusion"
+                    )
+                    outro_sec = outro_duration_seconds(self.config.raw_config)
+
                     chapters = build_chapter_markers(
                         job.usfm_file,
                         job.timing_file,
                         chapter=ch,
                         offset_seconds=offset,
-                        intro_label=f"{h_name or book} {ch}:1",
+                        outro_seconds=outro_sec,
+                        intro_label=intro_label,
+                        outro_label=outro_label,
                     )
                 except Exception as e:
                     print(f"[!] Warning: chapter markers failed for {entry_id}: {e}")

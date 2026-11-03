@@ -5,7 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.7] - 2026-11-02
+## [0.4.7] - 2026-11-03
+
+### Added
+- **Full Chapter Subheading Coverage in Descriptions (`{chapters}`):** Fixed subheading suppression where chapters with 1 or 2 subheadings had their section markers completely omitted from descriptions. Subheadings inside chapters are now always preserved in video descriptions with their exact timestamps and verse ranges (e.g. `0:00 Heading (1:1-17)`).
+- **Outro and Conclusion Timestamp Markers (`conclusion_label` / `outro_label`):** Automatically appends a chapter conclusion marker when video bumpers (outro / end screen) are present, or when needed to meet YouTube's 3-marker threshold for interactive player scrubber navigation.
+- **Configurable `intro_label` and `conclusion_label`:** Configurable in the `publishing:` block of YAML configurations with dynamic template resolution (e.g. `conclusion_label: "{h} {chapter} முடிவு"`).
+- **Multi-Bumper Video Concatenation:** Complete sequence support for `intro_video` + `main` + `outro_video` + `end_screen_video` with automatic resolution/fps normalization and silent stereo 48kHz audio generation for video-only clips.
+- **Configurable End Screen & Outro Duration Trimming (`end_screen_duration` / `outro_duration`):** Added optional duration limits to `bumpers:` in YAML configuration, allowing long video clips (e.g. 20s end screen templates) to be trimmed to any exact duration (such as `end_screen_duration: 1.0` for 1 second).
 
 ### Added
 - **Pre-recorded Video Bumpers (`intro_video` and `outro_video`):** Added native support for prepending an intro video clip and appending an outro (outdraw) video clip around rendered scripture videos in the `bumpers:` configuration block.

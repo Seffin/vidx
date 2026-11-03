@@ -81,13 +81,18 @@ def build_chapter_markers(
     timing_file,
     chapter=None,
     offset_seconds: float = 0.0,
+    outro_seconds: float = 0.0,
     intro_label: str = "Introduction",
+    outro_label: Optional[str] = None,
 ) -> str:
-    """Build a YouTube chapter block from the \\s headings and their timings.
+    r"""Build a YouTube chapter block from the \s headings and their timings.
 
-    Returns lines like ``0:00 Heading (1:1-8)``, or "" (with a printed warning)
-    when the data cannot satisfy YouTube's rules -- a chapter with two headings
-    is ordinary translation data, not a misconfiguration, so this never raises.
+    Returns lines like ``0:00 Heading (1:1-8)``. Handles:
+    - Snapping the first section heading to 0:00 when it introduces verse 1.
+    - Preserving opening verses (e.g. 1:1-3) under intro_label if they precede the first heading.
+    - Appending an outro / conclusion marker when outro video is present or to satisfy
+      YouTube's 3-marker scrubber threshold.
+    - Preserving subheadings in video description even if fewer than 3 exist.
     """
     tp = TimingParser(_read(timing_file), filepath=str(timing_file))
     tp.shift_timestamps(offset_seconds)  # keep bumper intros in step
@@ -100,25 +105,43 @@ def build_chapter_markers(
     up = USFMParser(_read(usfm_file), target_chapter=str(tp.chapter or chapter or 1))
 
     # Walk the rows once, pairing each heading with the verses that follow it.
+    pre_verses = []
     rows = []  # [start, heading_text, [verse ids...]]
+    first_sec_seen = False
+
     for e in tp.entries:
         vid, marker = parse_segment_id(e["segment"])
         if vid == "section":
+            first_sec_seen = True
             text = up.get_section_heading(marker)
             if text:
                 rows.append([float(e["start"]), text, []])
-        elif vid and rows and vid not in rows[-1][2]:
-            rows[-1][2].append(vid)
+        elif vid:
+            if not first_sec_seen:
+                if vid not in pre_verses:
+                    pre_verses.append(vid)
+            elif rows and vid not in rows[-1][2]:
+                rows[-1][2].append(vid)
+
     if not rows:
         return ""
 
-    if rows[0][0] < YT_MIN_CHAPTER_SEC:
-        rows[0][0] = 0.0                       # first heading owns 0:00
-    else:
-        rows.insert(0, [0.0, intro_label, []])  # verse 1 precedes the heading
-
     chap = up.chapter or tp.chapter or ""
     end = float(tp.entries[-1]["end"])
+
+    # If verses preceded the first heading, add an intro entry for them at 0:00
+    if pre_verses:
+        first = pre_verses[0].split("-")[0]
+        last = pre_verses[-1].split("-")[-1]
+        span = first if first == last else f"{first}-{last}"
+        lbl = f"{intro_label} ({chap}:{span})" if chap else f"{intro_label} ({span})"
+        rows.insert(0, [0.0, lbl, pre_verses])
+    elif rows:
+        if rows[0][0] <= 15.0:
+            rows[0][0] = 0.0
+        else:
+            rows.insert(0, [0.0, intro_label, []])
+
 
     kept = []
     for start, text, verses in rows:
@@ -127,7 +150,7 @@ def build_chapter_markers(
         if kept and start < kept[-1][0] + YT_MIN_CHAPTER_SEC:
             continue
         label = text
-        if verses:
+        if verses and not (pre_verses and start == 0.0):
             # Endpoints, not raw ids: a merged verse is itself "3-4", so joining
             # ids would read "3-4-5" for a section spanning 3-4 through 5.
             first = verses[0].split("-")[0]
@@ -135,16 +158,16 @@ def build_chapter_markers(
             span = first if first == last else f"{first}-{last}"
             label = f"{text} ({chap}:{span})" if chap else f"{text} ({span})"
         kept.append((start, label))
-    # the final chapter must also run 10s or more
-    if len(kept) > 1 and end - kept[-1][0] < YT_MIN_CHAPTER_SEC:
+
+    # The final chapter marker must not sit within 10s of narration end if no outro bumper exists
+    if len(kept) > 1 and outro_seconds < YT_MIN_CHAPTER_SEC and end - kept[-1][0] < YT_MIN_CHAPTER_SEC:
         kept.pop()
 
-    if len(kept) < YT_MIN_MARKERS:
-        print(
-            f"[!] Chapter markers skipped for {Path(timing_file).name}: only "
-            f"{len(kept)} usable section heading(s); YouTube needs {YT_MIN_MARKERS}."
-        )
-        return ""
+    # Append outro/conclusion marker if outro bumper exists (>= 10s) or to reach 3 markers
+    if outro_label and (len(kept) == 2 or outro_seconds >= YT_MIN_CHAPTER_SEC):
+        if kept and (end - kept[-1][0]) >= YT_MIN_CHAPTER_SEC:
+            kept.append((end, outro_label))
+
     return "\n".join(f"{_timestamp(s)} {label}" for s, label in kept)
 
 

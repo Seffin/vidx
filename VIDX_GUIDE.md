@@ -202,6 +202,8 @@ publishing:
   enabled: true
   privacy_status: "unlisted"
   playlist_name: "KFI New Testament — Kurumba Kannada Audio Bible"
+  intro_label: "{h} {chapter}"
+  conclusion_label: "{h} {chapter} முடிவு"
   title_template: "{h} {chapter:02d} — Kurumba Kannada Audio Bible"
   description_template: |
     {h} Chapter {chapter} — Kurumba Kannada Audio Bible
@@ -245,6 +247,8 @@ publishing:
   privacy_status: "unlisted"
   category_id: "27"
   playlist_name: "KFI New Testament — Kurumba Kannada Audio Bible"
+  intro_label: "{h} {chapter}"
+  conclusion_label: "{h} {chapter} முடிவு"
   title_template: "{h} {chapter:02d} — Kurumba Kannada Audio Bible"
   description_template: |
     {h} Chapter {chapter} | Kurumba Kannada Audio Bible
@@ -290,12 +294,12 @@ project:
 
 ---
 
-## ⚠️ Current Status: Not Yet Installed
+## ✅ Current Status: Installed & Production-Ready (v0.4.7)
 
-Running the install checks shows:
-- ❌ Python not found (Microsoft Store stub only — install real Python from python.org)
-- ❌ FFmpeg not found
-- ❌ `vidx` not installed
-
-**Follow STEP 0 first**, then run the test command from STEP 1.
+Environment verified:
+- ✔ Python 3.15 installed
+- ✔ FFmpeg installed and in PATH
+- ✔ `vidx` CLI & standalone executable `vidx.exe` v0.4.7 ready
+- ✔ Video Bumpers (`intro_video`, `outro_video`, `end_screen_video`) fully operational
+- ✔ Subheading markers with timestamps (`{chapters}`) active for YouTube descriptions & scrubber navigation
 
